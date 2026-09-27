@@ -1,4 +1,11 @@
 import asyncio
+import sys
+from pathlib import Path
+
+# Добавляем корень проекта в sys.path, чтобы импорты вида
+# "from gateway.config import ..." работали независимо от способа запуска.
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import create_async_engine

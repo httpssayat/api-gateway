@@ -1,12 +1,15 @@
 import asyncio
+import sys
 import uuid
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from gateway.config import get_settings
 from gateway.db import RequestAudit
-
 
 async def main() -> None:
     """

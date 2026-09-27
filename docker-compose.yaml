@@ -1,2 +1,114 @@
+
 services:
-  $END$
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: gateway
+      POSTGRES_PASSWORD: gateway
+      POSTGRES_DB: gateway
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gateway -d gateway"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
+  users:
+    build: .
+    command: uvicorn downstream.stub:app --host 0.0.0.0 --port 8000 --workers 1
+    environment:
+      SERVICE_NAME: users
+      DEFAULT_DELAY_MS: "10"
+      DEFAULT_ERROR_STATUS_CODE: "500"
+      ERROR_PROBABILITY: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  orders:
+    build: .
+    command: uvicorn downstream.stub:app --host 0.0.0.0 --port 8000 --workers 1
+    environment:
+      SERVICE_NAME: orders
+      DEFAULT_DELAY_MS: "10"
+      DEFAULT_ERROR_STATUS_CODE: "500"
+      ERROR_PROBABILITY: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  payments:
+    build: .
+    command: uvicorn downstream.stub:app --host 0.0.0.0 --port 8000 --workers 1
+    environment:
+      SERVICE_NAME: payments
+      DEFAULT_DELAY_MS: "10"
+      DEFAULT_ERROR_STATUS_CODE: "500"
+      ERROR_PROBABILITY: "0"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/_health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  gateway:
+    build: .
+    command: sh scripts/entrypoint.sh
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
+      REDIS_URL: redis://redis:6379/0
+
+      USERS_BASE_URL: http://users:8000
+      ORDERS_BASE_URL: http://orders:8000
+      PAYMENTS_BASE_URL: http://payments:8000
+
+      AUDIT_ENABLED: "${AUDIT_ENABLED:-false}"
+      CIRCUIT_ENABLED: "${CIRCUIT_ENABLED:-true}"
+      CIRCUIT_FAILURE_THRESHOLD: "${CIRCUIT_FAILURE_THRESHOLD:-100}"
+      CIRCUIT_COOLDOWN_MS: "${CIRCUIT_COOLDOWN_MS:-1000}"
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      users:
+        condition: service_healthy
+      orders:
+        condition: service_healthy
+      payments:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health')"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  load:
+    build: .
+    command: sh load/run_load.sh http://gateway:8080
+    volumes:
+      - ./load/results:/app/load/results
+    depends_on:
+      gateway:
+        condition: service_healthy
+    profiles:
+      - load
