@@ -129,7 +129,7 @@ async def correlation_id_middleware(request: Request, call_next):
 
     request_id = request.headers.get(settings.request_id_header)
     if not request_id:
-        request_id = uuid4().hex
+        request_id = uuid.uuid4().hex
 
     token = correlation_id_var.set(request_id)
 
