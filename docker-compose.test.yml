@@ -1,0 +1,21 @@
+version: "3.9"
+
+services:
+  gateway:
+    environment:
+      AUDIT_ENABLED: "true"
+      CIRCUIT_FAILURE_THRESHOLD: "1000"
+
+  tests:
+    build: .
+    command: sh scripts/test.sh
+    environment:
+      DATABASE_URL: postgresql+asyncpg://gateway:gateway@postgres:5432/gateway
+      REDIS_URL: redis://redis:6379/0
+      GATEWAY_URL: http://gateway:8080
+      ORDERS_INTERNAL_URL: http://orders:8000
+    depends_on:
+      gateway:
+        condition: service_healthy
+    profiles:
+      - test
